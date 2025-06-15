@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime
 from sklearn.linear_model import LinearRegression
 
-# 폰트 설정
+# 한글 폰트 설정
 plt.rcParams['font.family'] = 'NanumGothic'
 
 # --------------------
@@ -23,14 +23,11 @@ def load_data():
 df = load_data()
 
 # --------------------
-# 🎛️ 성별 선택 & 예측 기간 고정
+# 📅 슬라이더: 분석 범위 선택
 # --------------------
 st.title("📈 20–29세 청년 실업률 분석 및 예측")
-selected_gender = st.radio("성별을 선택하세요", ['남자', '여자'], horizontal=True)
+st.markdown("과거 실업률은 슬라이더로 기간을 조절하고, 향후 5년간 실업률을 **남녀 동시에 예측**합니다.")
 
-# --------------------
-# 📅 슬라이더: 분석 범위 선택 (월 단위)
-# --------------------
 start_date = df['년월'].min().to_pydatetime()
 end_date = df['년월'].max().to_pydatetime()
 
@@ -43,64 +40,74 @@ selected_range = st.slider(
 )
 
 # --------------------
-# 📊 실제 실업률 추이 (선택 구간)
+# 📊 실제 실업률 (남/녀 모두)
 # --------------------
-st.subheader("📊 선택한 기간의 월별 실업률")
-filtered_df = df[
-    (df['년월'] >= selected_range[0]) &
-    (df['년월'] <= selected_range[1]) &
-    (df['성별'] == selected_gender)
-]
+st.subheader("📊 실제 실업률 (선택 구간)")
+filtered_df = df[(df['년월'] >= selected_range[0]) & (df['년월'] <= selected_range[1])]
 
 fig1, ax1 = plt.subplots(figsize=(10, 4))
-ax1.plot(filtered_df['년월'], filtered_df['실업률'], marker='o', color='orange')
+for gender, color in zip(['남자', '여자'], ['blue', 'orange']):
+    subset = filtered_df[filtered_df['성별'] == gender]
+    ax1.plot(subset['년월'], subset['실업률'], marker='o', label=gender, color=color)
+
 ax1.set_xlabel("년월")
 ax1.set_ylabel("실업률 (%)")
-ax1.set_title(f"{selected_gender} 청년 실업률 (선택한 구간)")
+ax1.set_title("남녀 청년 실업률 (선택 구간)")
 ax1.grid(True, linestyle='--', alpha=0.4)
+ax1.legend()
 fig1.tight_layout()
 st.pyplot(fig1)
 
 # --------------------
-# 🤖 향후 12개월 예측
+# 🤖 향후 5년 예측 (60개월)
 # --------------------
-st.subheader(f"🔮 {selected_gender} 실업률 예측 (향후 12개월)")
+st.subheader("🔮 남녀 실업률 예측 (향후 5년)")
 
-# 예측용 데이터 준비
-gender_df = df[df['성별'] == selected_gender][['년월', '실업률']].reset_index(drop=True)
-gender_df['month_index'] = np.arange(len(gender_df))
-
-# Linear Regression 모델
-X = gender_df[['month_index']]
-y = gender_df['실업률']
-model = LinearRegression().fit(X, y)
-
-# 향후 12개월 예측
-future_months = 12
-future_index = np.arange(len(gender_df), len(gender_df) + future_months)
-future_preds = model.predict(future_index.reshape(-1, 1))
-
-# 날짜 생성
-last_date = gender_df['년월'].iloc[-1]
-future_dates = pd.date_range(start=last_date + pd.DateOffset(months=1), periods=future_months, freq='MS')
-
-# 예측 결과 정리
-pred_df = pd.DataFrame({
-    '예측 월': future_dates,
-    '예측 실업률': future_preds
-})
-
-# 예측 그래프
+future_months = 60
 fig2, ax2 = plt.subplots(figsize=(10, 4))
-ax2.plot(future_dates, future_preds, label="예측 실업률", marker='o', linestyle='--', color='red')
+
+# 예측 결과 저장용 테이블
+combined_pred_df = pd.DataFrame()
+
+for gender, color in zip(['남자', '여자'], ['blue', 'orange']):
+    gender_df = df[df['성별'] == gender][['년월', '실업률']].reset_index(drop=True)
+    gender_df['month_index'] = np.arange(len(gender_df))
+
+    # 모델 학습
+    X = gender_df[['month_index']]
+    y = gender_df['실업률']
+    model = LinearRegression().fit(X, y)
+
+    # 예측 수행
+    future_index = np.arange(len(gender_df), len(gender_df) + future_months)
+    future_preds = model.predict(future_index.reshape(-1, 1))
+
+    # 날짜 생성
+    last_date = gender_df['년월'].iloc[-1]
+    future_dates = pd.date_range(start=last_date + pd.DateOffset(months=1), periods=future_months, freq='MS')
+
+    # 그래프 출력
+    ax2.plot(future_dates, future_preds, label=f"{gender} 예측", linestyle='--', marker='o', color=color)
+
+    # 예측 테이블 저장
+    temp_df = pd.DataFrame({
+        '성별': gender,
+        '예측 월': future_dates,
+        '예측 실업률': future_preds
+    })
+    combined_pred_df = pd.concat([combined_pred_df, temp_df], ignore_index=True)
+
+# 그래프 마무리
 ax2.set_xlabel("예측 월")
 ax2.set_ylabel("실업률 (%)")
-ax2.set_title(f"{selected_gender} 청년 실업률 예측 (Linear Regression)")
+ax2.set_title("향후 5년간 남녀 청년 실업률 예측")
 ax2.grid(True, linestyle='--', alpha=0.3)
 ax2.legend()
 fig2.tight_layout()
 st.pyplot(fig2)
 
-# 예측 테이블
-st.subheader("📋 예측 결과 테이블")
-st.dataframe(pred_df.reset_index(drop=True))
+# --------------------
+# 📋 예측 결과 테이블
+# --------------------
+st.subheader("📋 예측 결과 (남녀, 향후 5년)")
+st.dataframe(combined_pred_df.reset_index(drop=True))
