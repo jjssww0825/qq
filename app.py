@@ -1,15 +1,9 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
 from datetime import datetime
 from sklearn.linear_model import LinearRegression
-import matplotlib.font_manager as fm
-
-# ✅ 한글 폰트 설정 (업로드된 ttf 사용)
-font_path = "NanumHumanRegular.ttf"
-font_prop = fm.FontProperties(fname=font_path)
-plt.rcParams['font.family'] = font_prop.get_name()
+import plotly.express as px
 
 # --------------------
 # 📦 데이터 불러오기
@@ -29,7 +23,7 @@ df = load_data()
 # 🎛️ 앱 제목 및 설명
 # --------------------
 st.title("📈 20–29세 청년 실업률 분석 및 예측")
-st.markdown("과거 실업률은 슬라이더로 기간을 조절하고, 향후 5년간 실업률을 **남녀 동시에 예측**합니다.")
+st.markdown("슬라이더로 과거 실업률을 분석하고, 남녀 청년 실업률을 **향후 5년간 예측**합니다. Plotly로 구현해 한글도 깨지지 않습니다!")
 
 # --------------------
 # 📅 슬라이더: 분석 범위 선택
@@ -46,70 +40,70 @@ selected_range = st.slider(
 )
 
 # --------------------
-# 📊 실제 실업률 시각화
+# 📊 실제 실업률 (Plotly)
 # --------------------
-st.subheader("📊 실제 실업률 (선택 구간)")
+st.subheader("📊 남녀 청년 실업률 (선택 구간)")
 filtered_df = df[(df['년월'] >= selected_range[0]) & (df['년월'] <= selected_range[1])]
 
-fig1, ax1 = plt.subplots(figsize=(10, 4))
-for gender, color in zip(['남자', '여자'], ['blue', 'orange']):
-    subset = filtered_df[filtered_df['성별'] == gender]
-    ax1.plot(subset['년월'], subset['실업률'], marker='o', label=gender, color=color)
-
-ax1.set_xlabel("년월")
-ax1.set_ylabel("실업률 (%)")
-ax1.set_title("남녀 청년 실업률 (선택 구간)")
-ax1.grid(True, linestyle='--', alpha=0.4)
-ax1.legend()
-fig1.tight_layout()
-st.pyplot(fig1)
+fig1 = px.line(
+    filtered_df,
+    x='년월',
+    y='실업률',
+    color='성별',
+    markers=True,
+    title="실제 실업률 추이 (남녀)"
+)
+fig1.update_layout(xaxis_title="년월", yaxis_title="실업률 (%)")
+st.plotly_chart(fig1)
 
 # --------------------
-# 🤖 예측 (남녀 각각, 향후 5년)
+# 🤖 예측 (남녀 5년 = 60개월)
 # --------------------
-st.subheader("🔮 남녀 실업률 예측 (향후 5년)")
+st.subheader("🔮 향후 5년 예측 (남녀)")
 
 future_months = 60
-fig2, ax2 = plt.subplots(figsize=(10, 4))
-combined_pred_df = pd.DataFrame()
+all_preds = []
 
-for gender, color in zip(['남자', '여자'], ['blue', 'orange']):
+for gender in ['남자', '여자']:
     gender_df = df[df['성별'] == gender][['년월', '실업률']].reset_index(drop=True)
     gender_df['month_index'] = np.arange(len(gender_df))
 
-    # 모델 학습
+    # 학습
     X = gender_df[['month_index']]
     y = gender_df['실업률']
     model = LinearRegression().fit(X, y)
 
     # 예측
     future_index = np.arange(len(gender_df), len(gender_df) + future_months)
-    future_preds = model.predict(future_index.reshape(-1, 1))
+    preds = model.predict(future_index.reshape(-1, 1))
     last_date = gender_df['년월'].iloc[-1]
     future_dates = pd.date_range(start=last_date + pd.DateOffset(months=1), periods=future_months, freq='MS')
 
-    # 그래프
-    ax2.plot(future_dates, future_preds, label=f"{gender} 예측", marker='o', linestyle='--', color=color)
-
-    # 결과 저장
+    # 저장
     temp_df = pd.DataFrame({
-        '성별': gender,
-        '예측 월': future_dates,
-        '예측 실업률': future_preds
+        '년월': future_dates,
+        '예측 실업률': preds,
+        '성별': gender
     })
-    combined_pred_df = pd.concat([combined_pred_df, temp_df], ignore_index=True)
+    all_preds.append(temp_df)
 
-# 그래프 마무리
-ax2.set_xlabel("예측 월")
-ax2.set_ylabel("실업률 (%)")
-ax2.set_title("향후 5년간 남녀 청년 실업률 예측")
-ax2.grid(True, linestyle='--', alpha=0.3)
-ax2.legend()
-fig2.tight_layout()
-st.pyplot(fig2)
+# 결합
+pred_df = pd.concat(all_preds).reset_index(drop=True)
+
+# Plotly 그래프
+fig2 = px.line(
+    pred_df,
+    x='년월',
+    y='예측 실업률',
+    color='성별',
+    markers=True,
+    title="향후 5년 남녀 실업률 예측 (Linear Regression)"
+)
+fig2.update_layout(xaxis_title="예측 월", yaxis_title="실업률 (%)")
+st.plotly_chart(fig2)
 
 # --------------------
 # 📋 예측 결과 테이블
 # --------------------
 st.subheader("📋 예측 결과 (남녀, 향후 5년)")
-st.dataframe(combined_pred_df.reset_index(drop=True))
+st.dataframe(pred_df)
