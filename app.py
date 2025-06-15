@@ -4,9 +4,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from datetime import datetime
 from sklearn.linear_model import LinearRegression
+import matplotlib.font_manager as fm
 
-# 한글 폰트 설정
-plt.rcParams['font.family'] = 'NanumGothic'
+# ✅ 한글 폰트 설정 (업로드된 ttf 사용)
+font_path = "NanumHumanRegular.ttf"
+font_prop = fm.FontProperties(fname=font_path)
+plt.rcParams['font.family'] = font_prop.get_name()
 
 # --------------------
 # 📦 데이터 불러오기
@@ -23,11 +26,14 @@ def load_data():
 df = load_data()
 
 # --------------------
-# 📅 슬라이더: 분석 범위 선택
+# 🎛️ 앱 제목 및 설명
 # --------------------
 st.title("📈 20–29세 청년 실업률 분석 및 예측")
 st.markdown("과거 실업률은 슬라이더로 기간을 조절하고, 향후 5년간 실업률을 **남녀 동시에 예측**합니다.")
 
+# --------------------
+# 📅 슬라이더: 분석 범위 선택
+# --------------------
 start_date = df['년월'].min().to_pydatetime()
 end_date = df['년월'].max().to_pydatetime()
 
@@ -40,7 +46,7 @@ selected_range = st.slider(
 )
 
 # --------------------
-# 📊 실제 실업률 (남/녀 모두)
+# 📊 실제 실업률 시각화
 # --------------------
 st.subheader("📊 실제 실업률 (선택 구간)")
 filtered_df = df[(df['년월'] >= selected_range[0]) & (df['년월'] <= selected_range[1])]
@@ -59,14 +65,12 @@ fig1.tight_layout()
 st.pyplot(fig1)
 
 # --------------------
-# 🤖 향후 5년 예측 (60개월)
+# 🤖 예측 (남녀 각각, 향후 5년)
 # --------------------
 st.subheader("🔮 남녀 실업률 예측 (향후 5년)")
 
 future_months = 60
 fig2, ax2 = plt.subplots(figsize=(10, 4))
-
-# 예측 결과 저장용 테이블
 combined_pred_df = pd.DataFrame()
 
 for gender, color in zip(['남자', '여자'], ['blue', 'orange']):
@@ -78,18 +82,16 @@ for gender, color in zip(['남자', '여자'], ['blue', 'orange']):
     y = gender_df['실업률']
     model = LinearRegression().fit(X, y)
 
-    # 예측 수행
+    # 예측
     future_index = np.arange(len(gender_df), len(gender_df) + future_months)
     future_preds = model.predict(future_index.reshape(-1, 1))
-
-    # 날짜 생성
     last_date = gender_df['년월'].iloc[-1]
     future_dates = pd.date_range(start=last_date + pd.DateOffset(months=1), periods=future_months, freq='MS')
 
-    # 그래프 출력
-    ax2.plot(future_dates, future_preds, label=f"{gender} 예측", linestyle='--', marker='o', color=color)
+    # 그래프
+    ax2.plot(future_dates, future_preds, label=f"{gender} 예측", marker='o', linestyle='--', color=color)
 
-    # 예측 테이블 저장
+    # 결과 저장
     temp_df = pd.DataFrame({
         '성별': gender,
         '예측 월': future_dates,
