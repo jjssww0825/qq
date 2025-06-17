@@ -48,7 +48,7 @@ fig_real.update_layout(
 st.plotly_chart(fig_real)
 
 # 2️⃣ 예측 실업률 그래프 (Prophet, 최근 5년만 사용)
-st.title("🔮 남녀 청년 실업률 예측 (향후 5년, Prophet, 최근 5년만 사용, 실제와 분리)")
+st.title("🔮 남녀 청년 실업률 예측 (향후 5년, Prophet)")
 future_months = 60
 cut_off = pd.Timestamp('2019-01-01')  # <-- 최근 5년치만 Prophet에 사용
 recent_df = df[df['년월'] >= cut_off].copy()
