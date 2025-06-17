@@ -29,7 +29,7 @@ selected_range = st.slider(
 filtered_df = df[(df['년월'] >= selected_range[0]) & (df['년월'] <= selected_range[1])]
 
 # 1️⃣ 실제 실업률 그래프 (슬라이더 반영)
-st.title("📊 남녀 청년 실업률 (실제 데이터, 구간 이동 가능)")
+st.title("📊 남녀 청년 실업률")
 fig_real = go.Figure()
 for gender, color in zip(['남자', '여자'], ['blue', 'orange']):
     subset = filtered_df[filtered_df['성별'] == gender]
