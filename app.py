@@ -6,7 +6,7 @@ from sklearn.linear_model import LinearRegression
 import plotly.express as px
 
 # --------------------
-# 📦 데이터 불러오기
+# 데이터 불러오기
 # --------------------
 @st.cache_data
 def load_data():
@@ -20,49 +20,10 @@ def load_data():
 df = load_data()
 
 # --------------------
-# 🎛️ 앱 제목 및 설명
+# 과거 + 예측 데이터 결합
 # --------------------
-st.title("📈 20–29세 청년 실업률 분석 및 예측")
-st.markdown("")
-
-# --------------------
-# 📅 슬라이더: 분석 범위 선택
-# --------------------
-start_date = df['년월'].min().to_pydatetime()
-end_date = df['년월'].max().to_pydatetime()
-
-selected_range = st.slider(
-    "분석할 월 범위 선택",
-    min_value=start_date,
-    max_value=end_date,
-    value=(start_date, end_date),
-    format="YYYY-MM"
-)
-
-# --------------------
-# 📊 실제 실업률 (Plotly)
-# --------------------
-st.subheader("📊 남녀 청년 실업률 (선택 구간)")
-filtered_df = df[(df['년월'] >= selected_range[0]) & (df['년월'] <= selected_range[1])]
-
-fig1 = px.line(
-    filtered_df,
-    x='년월',
-    y='실업률',
-    color='성별',
-    markers=True,
-    title="실제 실업률 추이 (남녀)"
-)
-fig1.update_layout(xaxis_title="년월", yaxis_title="실업률 (%)")
-st.plotly_chart(fig1)
-
-# --------------------
-# 🤖 예측 (남녀 5년 = 60개월)
-# --------------------
-st.subheader("🔮 향후 5년 예측 (남녀)")
-
 future_months = 60
-all_preds = []
+all_combined = []
 
 for gender in ['남자', '여자']:
     gender_df = df[df['성별'] == gender][['년월', '실업률']].reset_index(drop=True)
@@ -79,31 +40,48 @@ for gender in ['남자', '여자']:
     last_date = gender_df['년월'].iloc[-1]
     future_dates = pd.date_range(start=last_date + pd.DateOffset(months=1), periods=future_months, freq='MS')
 
-    # 저장
-    temp_df = pd.DataFrame({
+    # 실제 + 예측 데이터 결합
+    df_actual = gender_df[['년월', '실업률']].copy()
+    df_actual.columns = ['년월', '실업률']
+    df_actual['성별'] = gender
+    df_actual['구분'] = '실제'
+
+    df_future = pd.DataFrame({
         '년월': future_dates,
-        '예측 실업률': preds,
-        '성별': gender
+        '실업률': preds,
+        '성별': gender,
+        '구분': '예측'
     })
-    all_preds.append(temp_df)
 
-# 결합
-pred_df = pd.concat(all_preds).reset_index(drop=True)
+    all_combined.append(pd.concat([df_actual, df_future]))
 
-# Plotly 그래프
-fig2 = px.line(
-    pred_df,
+df_final = pd.concat(all_combined).reset_index(drop=True)
+
+# --------------------
+# 📈 Plotly 그래프 출력
+# --------------------
+st.title("📈 20–29세 청년 실업률 추이 및 향후 5년 예측")
+
+fig = px.line(
+    df_final,
     x='년월',
-    y='예측 실업률',
+    y='실업률',
     color='성별',
+    line_dash='구분',
     markers=True,
-    title="향후 5년 남녀 실업률 예측 (Linear Regression)"
+    title="실제 + 예측 실업률 추이 (남녀)"
 )
-fig2.update_layout(xaxis_title="예측 월", yaxis_title="실업률 (%)")
-st.plotly_chart(fig2)
+
+fig.update_layout(
+    xaxis_title="년월",
+    yaxis_title="실업률 (%)",
+    legend_title="성별 / 구분"
+)
+
+st.plotly_chart(fig)
 
 # --------------------
-# 📋 예측 결과 테이블
+# 📋 데이터 테이블
 # --------------------
-st.subheader("📋 예측 결과 (남녀, 향후 5년)")
-st.dataframe(pred_df)
+st.subheader("📋 전체 데이터 (실제 + 예측)")
+st.dataframe(df_final)
