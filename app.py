@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime
-from sklearn.linear_model import LinearRegression
+from prophet import Prophet
 import plotly.graph_objects as go
 
 # 데이터 불러오기
@@ -48,29 +47,28 @@ fig_real.update_layout(
 )
 st.plotly_chart(fig_real)
 
-# 2️⃣ 예측 실업률 그래프 (전체기간 이후 5년)
-st.title("🔮 남녀 청년 실업률 예측 (향후 5년, 실제와 분리)")
+# 2️⃣ 예측 실업률 그래프 (Prophet, 전체 이후 5년)
+st.title("🔮 남녀 청년 실업률 예측 (향후 5년, Prophet, 실제와 분리)")
 future_months = 60
 fig_pred = go.Figure()
 for gender, color in zip(['남자', '여자'], ['blue', 'orange']):
-    gender_df = df[df['성별'] == gender][['년월', '실업률']].reset_index(drop=True)
-    gender_df['month_index'] = np.arange(len(gender_df))
-    X = gender_df[['month_index']]
-    y = gender_df['실업률']
-    model = LinearRegression().fit(X, y)
-    last_date = gender_df['년월'].iloc[-1]
-    future_index = np.arange(len(gender_df), len(gender_df) + future_months)
-    preds = model.predict(future_index.reshape(-1, 1))
-    future_dates = pd.date_range(start=last_date + pd.DateOffset(months=1), periods=future_months, freq='MS')
+    gender_df = df[df['성별'] == gender][['년월', '실업률']].rename(columns={"년월": "ds", "실업률": "y"})
+    m = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
+    m.fit(gender_df)
+    # 예측 (미래 60개월)
+    future = m.make_future_dataframe(periods=future_months, freq='MS')
+    forecast = m.predict(future)
+    # 예측 부분만 추출
+    forecast_future = forecast.iloc[-future_months:]
     fig_pred.add_trace(go.Scatter(
-        x=future_dates,
-        y=preds,
+        x=forecast_future['ds'],
+        y=forecast_future['yhat'],
         mode='lines+markers',
         name=f"{gender} (예측)",
         line=dict(color=color, dash='dash', width=2)
     ))
 fig_pred.update_layout(
-    title="향후 5년 예측 실업률 (남녀)",
+    title="향후 5년 예측 실업률 (남녀, Prophet 기반)",
     xaxis_title="년월",
     yaxis_title="실업률 (%)"
 )
