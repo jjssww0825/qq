@@ -47,18 +47,19 @@ fig_real.update_layout(
 )
 st.plotly_chart(fig_real)
 
-# 2️⃣ 예측 실업률 그래프 (Prophet, 전체 이후 5년)
-st.title("🔮 남녀 청년 실업률 예측 (향후 5년, Prophet, 실제와 분리)")
+# 2️⃣ 예측 실업률 그래프 (Prophet, 최근 5년만 사용)
+st.title("🔮 남녀 청년 실업률 예측 (향후 5년, Prophet, 최근 5년만 사용, 실제와 분리)")
 future_months = 60
+cut_off = pd.Timestamp('2019-01-01')  # <-- 최근 5년치만 Prophet에 사용
+recent_df = df[df['년월'] >= cut_off].copy()
 fig_pred = go.Figure()
 for gender, color in zip(['남자', '여자'], ['blue', 'orange']):
-    gender_df = df[df['성별'] == gender][['년월', '실업률']].rename(columns={"년월": "ds", "실업률": "y"})
+    gender_df = recent_df[recent_df['성별'] == gender][['년월', '실업률']].rename(columns={"년월": "ds", "실업률": "y"})
     m = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
     m.fit(gender_df)
     # 예측 (미래 60개월)
     future = m.make_future_dataframe(periods=future_months, freq='MS')
     forecast = m.predict(future)
-    # 예측 부분만 추출
     forecast_future = forecast.iloc[-future_months:]
     fig_pred.add_trace(go.Scatter(
         x=forecast_future['ds'],
@@ -68,7 +69,7 @@ for gender, color in zip(['남자', '여자'], ['blue', 'orange']):
         line=dict(color=color, dash='dash', width=2)
     ))
 fig_pred.update_layout(
-    title="향후 5년 예측 실업률 (남녀, Prophet 기반)",
+    title="향후 5년 예측 실업률 (남녀, Prophet, 최근 5년 데이터 기반)",
     xaxis_title="년월",
     yaxis_title="실업률 (%)"
 )
